@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=400, initial-scale=1.0" />
+  <title>배드민턴 포지셔닝 시뮬레이터</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; }
+    #court {
+      position: relative;
+      width: 400px;
+      height: 600px;
+      background-color: #e0f7fa;
+      margin: 20px auto;
+      border: 2px solid #000;
+    }
+    .player {
+      position: absolute;
+      width: 60px;
+      height: 30px;
+      background-color: #ffcc80;
+      border: 1px solid #000;
+      text-align: center;
+      line-height: 30px;
+      border-radius: 5px;
+    }
+    #net {
+      position: absolute;
+      width: 100%;
+      height: 4px;
+      background-color: #000;
+      top: 50%;
+      left: 0;
+      transform: translateY(-2px);
+    }
+    #shuttlecock {
+      position: absolute;
+      width: 15px;
+      height: 15px;
+      background-color: red;
+      border-radius: 50%;
+      display: none;
+      z-index: 10;
+    }
+    select, button { margin: 5px; }
+    #log { margin-top: 20px; text-align: left; width: 400px; margin-left: auto; margin-right: auto; }
+    #shotHistory {
+      margin: 30px auto 10px auto;
+      text-align: center;
+      width: 400px;
+    }
+    #shotHistory table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 0 auto;
+    }
+    #shotHistory th, #shotHistory td {
+      border: 1px solid #aaa;
+      padding: 4px 6px;
+      font-size: 14px;
+      text-align: center;
+    }
+    #shotHistory th {
+      background: #b3e5fc;
+    }
+    #shotHistory caption {
+      font-weight: bold; font-size: 17px; margin-bottom: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h2>배드민턴 포지셔닝 시뮬레이터</h2>
+  <div>
+    <input type="text" id="playerAName" placeholder="선수 A 이름" />
+    <input type="text" id="playerBName" placeholder="선수 B 이름" />
+    <input type="text" id="playerCName" placeholder="선수 C 이름" />
+    <input type="text" id="playerDName" placeholder="선수 D 이름" />
+    <button onclick="setPlayerNames()">이름 설정하기</button>
+  </div>
+  <div>
+    <select id="senderSelect"></select>
+    <select id="receiverSelect"></select>
+    <select id="skillSelect">
+      <option value="숏 서브">숏 서브</option>
+      <option value="롱 서브">롱 서브</option>
+      <option value="드롭">드롭</option>
+      <option value="스매시">스매시</option>
+      <option value="헤어핀">헤어핀</option>
+      <option value="드라이브">드라이브</option>
+      <option value="언더클리어">언더클리어</option>
+      <option value="하이클리어">하이클리어</option>
+      <option value="커트 수비">커트 수비</option>
+      <option value="클리어 수비">클리어 수비</option>
+    </select>
+    <button onclick="executeSkill()">기술 사용</button>
+    <button onclick="goBack()">이전</button>
+    <button onclick="resetAll()">초기화</button>
+  </div>
+  <div id="court">
+    <div id="net"></div>
+    <div id="shuttlecock"></div>
+    <div class="player" id="A"></div>
+    <div class="player" id="B"></div>
+    <div class="player" id="C"></div>
+    <div class="player" id="D"></div>
+  </div>
+  <div id="log"></div>
+  <div id="shotHistory"></div>
+  <script>
+    const skillList = [
+      "숏 서브","롱 서브","드롭","스매시","헤어핀","드라이브","언더클리어","하이클리어","커트 수비","클리어 수비"
+    ];
+    const players = {
+      A: { name: 'A', team: 'AB' },
+      B: { name: 'B', team: 'AB' },
+      C: { name: 'C', team: 'CD' },
+      D: { name: 'D', team: 'CD' },
+    };
+
+    let history = [];
+    let shotHistory = {
+      // 구조: {A: {스매시: 0, 드롭: 0, ...}, ...}
+      A: {}, B: {}, C: {}, D: {}
+    };
+    function initializeShotHistory() {
+      for (const pid in shotHistory) {
+        skillList.forEach(skill => { shotHistory[pid][skill] = 0; });
+      }
+    }
+    initializeShotHistory();
+
+    function setPlayerNames() {
+      players.A.name = document.getElementById('playerAName').value || 'A';
+      players.B.name = document.getElementById('playerBName').value || 'B';
+      players.C.name = document.getElementById('playerCName').value || 'C';
+      players.D.name = document.getElementById('playerDName').value || 'D';
+      updateDropdowns();
+      updatePositions();
+      renderShotHistory();
+    }
+
+    function updateDropdowns() {
+      const senderSelect = document.getElementById('senderSelect');
+      const receiverSelect = document.getElementById('receiverSelect');
+      senderSelect.innerHTML = '';
+      receiverSelect.innerHTML = '';
+      for (const key in players) {
+        const p = players[key];
+        const senderOption = new Option(p.name, key);
+        senderSelect.appendChild(senderOption);
+      }
+      updateReceiverOptions();
+      senderSelect.onchange = updateReceiverOptions;
+    }
+
+    function updateReceiverOptions() {
+      const sender = document.getElementById('senderSelect').value;
+      const receiverSelect = document.getElementById('receiverSelect');
+      receiverSelect.innerHTML = '';
+      for (const key in players) {
+        if (key !== sender && players[sender].team !== players[key].team) {
+          const option = new Option(players[key].name, key);
+          receiverSelect.appendChild(option);
+        }
+      }
+    }
+
+    function updatePositions() {
+      const positions = {
+        A: [150, 520], B: [250, 520],
+        C: [150, 50],  D: [250, 50]
+      };
+      for (const id in positions) {
+        const [x, y] = positions[id];
+        const elem = document.getElementById(id);
+        elem.style.left = x + 'px';
+        elem.style.top = y + 'px';
+        elem.textContent = players[id].name;
+      }
+    }
+
+    function executeSkill() {
+      const sender = document.getElementById('senderSelect').value;
+      const receiver = document.getElementById('receiverSelect').value;
+      const skill = document.getElementById('skillSelect').value;
+      history.push({ sender, receiver, skill });
+
+      // 누적 기록 갱신
+      shotHistory[sender][skill] = (shotHistory[sender][skill] || 0) + 1;
+      renderShotHistory();
+
+      // Shuttle animation
+      animateShuttle(sender, receiver);
+
+      // 포지션 로직
+      applyPositioning(sender, receiver, skill);
+
+      // 로그 기록
+      const log = document.getElementById('log');
+      log.innerHTML += `<p>${players[sender].name} → ${players[receiver].name} : ${skill}</p>`;
+
+      // 다음 순서 선수 자동 선택
+      document.getElementById('senderSelect').value = receiver;
+      updateReceiverOptions();
+    }
+
+    function applyPositioning(sender, receiver, skill) {
+      const teamSender = players[sender].team;
+      const partnerSender = Object.keys(players).find(p => players[p].team === teamSender && p !== sender);
+      const teamReceiver = players[receiver].team;
+      const partnerReceiver = Object.keys(players).find(p => players[p].team === teamReceiver && p !== receiver);
+
+      const positions = {};
+      if (["하이클리어", "언더클리어", "클리어 수비", "롱 서브"].includes(skill)) {
+        // 보낸 팀: 양 옆 수비
+        if (teamSender === 'AB') {
+          positions[sender] = [130, 520];
+          positions[partnerSender] = [270, 520];
+        } else {
+          positions[sender] = [130, 50];
+          positions[partnerSender] = [270, 50];
+        }
+        // 받은 팀: 후위 + 전위
+        if (teamReceiver === 'AB') {
+          positions[receiver] = [200, 550];
+          positions[partnerReceiver] = [200, 480];
+        } else {
+          positions[receiver] = [200, 20];
+          positions[partnerReceiver] = [200, 90];
+        }
+      } else if (skill === "커트 수비") {
+        // 보낸 선수 전위로
+        if (teamSender === 'AB') {
+          positions[sender] = [200, 480];
+          positions[partnerSender] = [200, 550];
+        } else {
+          positions[sender] = [200, 90];
+          positions[partnerSender] = [200, 20];
+        }
+      } else if (skill === "숏 서브") {
+        if (teamSender === 'AB') {
+          positions[sender] = [200, 480];
+          positions[partnerSender] = [200, 550];
+        } else {
+          positions[sender] = [200, 90];
+          positions[partnerSender] = [200, 20];
+        }
+      } else {
+        // 기본: 전위/후위 형태 유지
+        if (teamSender === 'AB') {
+          positions[sender] = [200, 480];
+          positions[partnerSender] = [200, 550];
+        } else {
+          positions[sender] = [200, 90];
+          positions[partnerSender] = [200, 20];
+        }
+      }
+
+      for (const id in positions) {
+        const elem = document.getElementById(id);
+        elem.style.left = positions[id][0] + 'px';
+        elem.style.top = positions[id][1] + 'px';
+      }
+    }
+
+    function animateShuttle(from, to) {
+      const fromElem = document.getElementById(from);
+      const toElem = document.getElementById(to);
+      const shuttle = document.getElementById('shuttlecock');
+      const fromX = fromElem.offsetLeft + 20;
+      const fromY = fromElem.offsetTop + 10;
+      const toX = toElem.offsetLeft + 20;
+      const toY = toElem.offsetTop + 10;
+      shuttle.style.left = fromX + 'px';
+      shuttle.style.top = fromY + 'px';
+      shuttle.style.display = 'block';
+      shuttle.animate([
+        { left: fromX + 'px', top: fromY + 'px' },
+        { left: toX + 'px', top: toY + 'px' }
+      ], {
+        duration: 600,
+        fill: 'forwards'
+      });
+      setTimeout(() => { shuttle.style.display = 'none'; }, 700);
+    }
+
+    function goBack() {
+      // 가장 최근 기록 pop 및 shotHistory도 감소 처리
+      const last = history.pop();
+      if (last) {
+        shotHistory[last.sender][last.skill] = Math.max(0, shotHistory[last.sender][last.skill] - 1);
+      }
+      // 로그, 포지션 리셋
+      document.getElementById('log').innerHTML = '';
+      history.forEach(({ sender, receiver, skill }) => {
+        applyPositioning(sender, receiver, skill);
+        document.getElementById('log').innerHTML += `<p>${players[sender].name} → ${players[receiver].name} : ${skill}</p>`;
+      });
+      renderShotHistory();
+    }
+
+    function resetAll() {
+      history = [];
+      initializeShotHistory();
+      document.getElementById('log').innerHTML = '';
+      updatePositions();
+      renderShotHistory();
+    }
+
+    function renderShotHistory() {
+      // 표 헤더: 선수, skill1, ..., skillN, 합계
+      let html = '<table><caption>샷(스트로크) 누적 기록</caption><thead><tr><th>선수</th>';
+      skillList.forEach(skill => { html += `<th>${skill}</th>`; });
+      html += '<th>합계</th></tr></thead><tbody>';
+      for (const pid of ["A","B","C","D"]) {
+        let playerSum = 0;
+        html += `<tr><th>${players[pid].name}</th>`;
+        skillList.forEach(skill => {
+          const count = shotHistory[pid][skill]||0;
+          html += `<td>${count}</td>`;
+          playerSum += count;
+        });
+        html += `<td>${playerSum}</td></tr>`;
+      }
+      html += '</tbody></table>';
+      document.getElementById('shotHistory').innerHTML = html;
+    }
+
+    setPlayerNames();
+  </script>
+</body>
+</html>
