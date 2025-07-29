@@ -22,51 +22,49 @@ with open('./index.html', 'r', encoding='utf-8') as f:
 # </html>
 # '''
 # Box#1(4), Box#2(1)
-# col1, col2 = st.columns((4,1))
-# with col1:
-#     with st.expander('content #1...'):
-#         url = 'https://www.youtube.com/watch?v=R5AbqmdVo6w'
-#         st.info('배드민턴 복식 로테이션을 알아보자!')
-#         st.video(url)
-    
-#     with st.expander('content #2...'):
-#         #st.write(html, unsafe_allow_html=True)
-#         htmlviewer.html(html, height=800)
-        
-# with col2:
-#     with st.expander('Tips..'):
-#         st.info('Tips..')
-
-col1, col2 = st.columns((4,1))
+col1, col2 = st.columns((4, 1))
 
 with col1:
     with st.expander('content #1...'):
         url = 'https://www.youtube.com/watch?v=R5AbqmdVo6w'
         st.info('배드민턴 복식 로테이션을 알아보자!')
         st.video(url)
-        
+
     with st.expander('content #2...'):
-        # 수평/수직 중앙 정렬을 위해 div로 감싸고, CSS flexbox를 활용합니다.
-        # width: 100%로 가득 채우면서 내부 콘텐츠는 최대 너비(예: 100%)를 넘지 않도록 조절합니다.
-        # height는 min(80vh, 800px)로 화면 높이에 따라 크기가 달라지도록 설정했습니다.
+        # div 내 스타일에서 max-width, max-height 적용 & 가로세로 100% 확장 + 화면 대응
         html_content = f"""
-        <div style="
+        <style>
+        .responsive-container {{
             display: flex;
             justify-content: center;
             align-items: center;
-            height: min(80vh, 800px);
             width: 100%;
-            ">
-            <div style="width: 100%; max-width: 100%;">
+            max-width: 100%;
+            height: 80vh; /* 화면 높이의 80% 사용 */
+            max-height: 800px; /* 최대 800px */
+            overflow: auto; /* 너무 클 경우 스크롤로 접근 가능 */
+        }}
+        .responsive-content {{
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+        }}
+        </style>
+        <div class="responsive-container">
+            <div class="responsive-content">
                 {html}
             </div>
         </div>
         """
-        htmlviewer.html(html_content, height=None)
+
+        # height 를 None 대신 큰 값 혹은 조절 가능한 값으로 정해서 iframe height 부족 문제 완화
+        htmlviewer.html(html_content, height=600)
 
 with col2:
     with st.expander('Tips..'):
         st.info('Tips..')
+
 
 st.markdown('<hr>', unsafe_allow_html=True)
 st.write('<font color="BLUE">(c)copyright. all rights reserved by CHEOLSEUNG KIM', unsafe_allow_html=True)
