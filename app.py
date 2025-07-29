@@ -1,5 +1,5 @@
 import streamlit as st
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_title='배드민턴 팀 스트로크 루틴')
 import streamlit.components.v1 as htmlviewer
 
 # Title Msg#1
