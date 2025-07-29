@@ -33,27 +33,28 @@ with col1:
     with st.expander('content #2...'):
         html_content = f"""
         <style>
-        .scroll-container {{
+        .responsive-wrapper {{
             width: 100%;
-            overflow-x: auto;
-            overflow-y: auto;
-            padding: 10px;
+            max-width: 1000px; /* 데스크탑 기준 최대 크기 */
+            margin: 0 auto;
             box-sizing: border-box;
         }}
-        .fixed-content {{
-            width: 1000px;  /* 콘텐츠 고정 너비 (모바일보다 넓게) */
-            max-width: 1000px;
+
+        .responsive-content {{
+            width: 100%;
+            height: auto;
         }}
 
         @media only screen and (max-width: 600px) {{
-            .fixed-content {{
-                width: 800px;  /* 모바일에서도 충분히 넓게 설정 */
+            .responsive-wrapper {{
+                max-width: 100%;  /* 모바일에서는 전체 화면 */
+                padding: 0 5px;
             }}
         }}
         </style>
 
-        <div class="scroll-container">
-            <div class="fixed-content">
+        <div class="responsive-wrapper">
+            <div class="responsive-content">
                 {html}
             </div>
         </div>
