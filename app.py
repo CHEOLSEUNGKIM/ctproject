@@ -61,8 +61,8 @@ with col1:
                 padding-right: 5px;
             }}
             .responsive-content {{
-                transform: scale(0.5);  /* 50% 더 축소 */
-                transform-origin: top left;
+                transform: scale(0.7);  /* 60% 더 축소 */
+                transform-origin: top center;
             }}
         }}
         </style>
