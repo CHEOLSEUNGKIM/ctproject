@@ -31,7 +31,6 @@ with col1:
         st.video(url)
 
     with st.expander('content #2...'):
-        # padding과 overflow-x 추가로 좌측 잘림 해결 시도
         html_content = f"""
         <style>
         .responsive-container {{
@@ -39,19 +38,32 @@ with col1:
             justify-content: center;
             align-items: center;
             width: 100%;
-            max-width: 100%;
-            height: 80vh;
+            height: 80vh; /* 화면 높이 80%로 반응형 */
             max-height: 800px;
-            overflow-x: auto;    /* 좌우 스크롤 허용 */
-            overflow-y: auto;    /* 필요시 세로 스크롤도 허용 */
-            padding-left: 10px;  /* 좌측 여백 추가 */
-            box-sizing: border-box; /* 패딩 포함 크기 계산 */
+            padding-left: 10px;
+            padding-right: 10px;
+            box-sizing: border-box;
+            overflow-x: auto;
+            overflow-y: auto;
         }}
         .responsive-content {{
             width: 100%;
             max-width: 100%;
-            max-height: 100%;
+            height: 100%;
             box-sizing: border-box;
+        }}
+
+        /* 모바일 대응: 화면 폭 600px 이하일 때 크기 조정 */
+        @media only screen and (max-width: 600px) {{
+            .responsive-container {{
+                height: 60vh;
+                padding-left: 5px;
+                padding-right: 5px;
+            }}
+            .responsive-content {{
+                transform: scale(0.5);  /* 50% 더 축소 */
+                transform-origin: top left;
+            }}
         }}
         </style>
 
@@ -62,7 +74,6 @@ with col1:
         </div>
         """
 
-        # height는 적당히 조절하거나 고정값 사용 가능
         htmlviewer.html(html_content, height=600)
 
 with col2:
