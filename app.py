@@ -31,7 +31,7 @@ with col1:
         st.video(url)
 
     with st.expander('content #2...'):
-        # div 내 스타일에서 max-width, max-height 적용 & 가로세로 100% 확장 + 화면 대응
+        # padding과 overflow-x 추가로 좌측 잘림 해결 시도
         html_content = f"""
         <style>
         .responsive-container {{
@@ -40,17 +40,21 @@ with col1:
             align-items: center;
             width: 100%;
             max-width: 100%;
-            height: 80vh; /* 화면 높이의 80% 사용 */
-            max-height: 800px; /* 최대 800px */
-            overflow: auto; /* 너무 클 경우 스크롤로 접근 가능 */
+            height: 80vh;
+            max-height: 800px;
+            overflow-x: auto;    /* 좌우 스크롤 허용 */
+            overflow-y: auto;    /* 필요시 세로 스크롤도 허용 */
+            padding-left: 10px;  /* 좌측 여백 추가 */
+            box-sizing: border-box; /* 패딩 포함 크기 계산 */
         }}
         .responsive-content {{
             width: 100%;
-            height: 100%;
             max-width: 100%;
             max-height: 100%;
+            box-sizing: border-box;
         }}
         </style>
+
         <div class="responsive-container">
             <div class="responsive-content">
                 {html}
@@ -58,12 +62,13 @@ with col1:
         </div>
         """
 
-        # height 를 None 대신 큰 값 혹은 조절 가능한 값으로 정해서 iframe height 부족 문제 완화
+        # height는 적당히 조절하거나 고정값 사용 가능
         htmlviewer.html(html_content, height=600)
 
 with col2:
     with st.expander('Tips..'):
         st.info('Tips..')
+
 
 
 st.markdown('<hr>', unsafe_allow_html=True)
