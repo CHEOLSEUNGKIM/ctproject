@@ -59,7 +59,7 @@ with col1:
         </div>
         """
 
-        htmlviewer.html(html_content, height=1000)
+        htmlviewer.html(html_content, height=900)
 
 with col2:
     with st.expander('Tips..'):
