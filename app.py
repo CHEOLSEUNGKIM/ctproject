@@ -33,42 +33,27 @@ with col1:
     with st.expander('content #2...'):
         html_content = f"""
         <style>
-        .responsive-container {{
-            display: flex;
-            justify-content: center;
-            align-items: center;
+        .scroll-container {{
             width: 100%;
-            height: 80vh; /* 화면 높이 80%로 반응형 */
-            max-height: 800px;
-            padding-left: 10px;
-            padding-right: 10px;
-            box-sizing: border-box;
             overflow-x: auto;
             overflow-y: auto;
-        }}
-        .responsive-content {{
-            width: 100%;
-            max-width: 100%;
-            height: 100%;
+            padding: 10px;
             box-sizing: border-box;
         }}
+        .fixed-content {{
+            width: 1000px;  /* 콘텐츠 고정 너비 (모바일보다 넓게) */
+            max-width: 1000px;
+        }}
 
-        /* 모바일 대응: 화면 폭 600px 이하일 때 크기 조정 */
         @media only screen and (max-width: 600px) {{
-            .responsive-container {{
-                height: 60vh;
-                padding-left: 5px;
-                padding-right: 5px;
-            }}
-            .responsive-content {{
-                transform: scale(0.7);  /* 60% 더 축소 */
-                transform-origin: top center;
+            .fixed-content {{
+                width: 800px;  /* 모바일에서도 충분히 넓게 설정 */
             }}
         }}
         </style>
 
-        <div class="responsive-container">
-            <div class="responsive-content">
+        <div class="scroll-container">
+            <div class="fixed-content">
                 {html}
             </div>
         </div>
@@ -79,6 +64,7 @@ with col1:
 with col2:
     with st.expander('Tips..'):
         st.info('Tips..')
+
 
 
 
