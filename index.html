@@ -8,16 +8,23 @@
     body { font-family: Arial, sans-serif; margin: 0; background: #f2f2f2;}
     #layout { display: flex; flex-direction: row; align-items: flex-start; justify-content: center; margin-top: 16px; }
     #mainPanel { min-width: 450px; }
-    #sidePanel { min-width: 310px; max-width: 340px; padding-left: 20px; height: 715px; box-sizing: border-box; display: flex; flex-direction: column; align-items: flex-start; }
+    #sidePanel {
+      min-width: 316px; max-width: 360px; width: 340px; padding-left: 20px;
+      height: 715px; box-sizing: border-box; display: flex; flex-direction: column; align-items: flex-start;
+      overflow-x: auto;
+    }
     #court { position: relative; width: 400px; height: 600px; background-color: #e0f7fa; margin: 20px auto 0 auto; border: 2px solid #000; box-shadow: 1px 2px 11px #cfebf5; }
     #centerLine { position: absolute; border-left: 2px solid #1976D2; height: 100%; left: 50%; top: 0; transform: translateX(-1px); opacity: 0.8; z-index: 9; pointer-events: none;}
-    .player { position: absolute; width: 60px; height: 30px; background-color: #ffcc80; border: 1px solid #000; text-align: center; line-height: 30px; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer; transition: outline 0.15s; }
+    .player { position: absolute; width: 60px; height: 30px; background-color: #ffcc80; border: 1px solid #000; text-align: center; line-height: 30px; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer; transition: outline 0.15s; user-select: none;}
     #net { position: absolute; width: 100%; height: 4px; background-color: #000; top: 50%; left: 0; transform: translateY(-2px); z-index: 11;}
     #shuttlecock { position: absolute; width: 15px; height: 15px; background-color: red; border-radius: 50%; display: none; z-index: 12; }
     select, button { margin: 5px; font-size: 15px;}
     #log { margin-top: 18px; text-align: left; width: 400px; margin-left: auto; margin-right: auto; min-height: 42px; font-size: 15px;}
     #shotHistoryContainer { width: 100%; padding-top: 10px; }
-    #shotHistoryList { width: 99%; min-height: 60px; background: #fff; box-shadow: 0 0 8px #cdeefa34; border-radius: 7px; padding: 12px 8px 12px 18px; margin-bottom: 40px; font-size: 15px; max-height: 510px; overflow-y: auto; }
+    #shotHistoryList {
+      width: 100%; min-height: 60px; max-height: 330px; background: #fff; box-shadow: 0 0 8px #cdeefa34; border-radius: 7px;
+      padding: 12px 8px 12px 18px; margin-bottom: 40px; font-size: 15px; overflow-y: auto; box-sizing: border-box;
+    }
     #shotHistoryTitle { font-weight: bold; font-size: 17px; color: #1668b3; margin-bottom: 12px; margin-top: 2px;}
     .shotItem { margin-bottom: 6px;}
     #swapButtons { margin-top: 12px; text-align: center;}
@@ -52,6 +59,7 @@
         <button onclick="executeSkill()">기술 사용</button>
         <button onclick="goBack()">이전</button>
         <button onclick="resetAll()">초기화</button>
+        <button onclick="generateSampleData()">샘플 데이터 생성</button>
       </div>
       <div id="court">
         <div id="centerLine"></div>
@@ -76,9 +84,21 @@
     </div>
   </div>
   <script>
+    // ----------- 규칙/상수 -----------
     const skillList = [
       "숏 서브","롱 서브","드롭","스매시","헤어핀","드라이브","언더클리어","하이클리어","커트 수비","클리어 수비"
     ];
+    const D_REAR_SHOTS = ["스매시","드롭","하이클리어"];
+    // 규칙: 전위샷 직후 응수
+    const FRONT_RESPONDABLE_PREV = ["헤어핀", "드롭", "커트 수비", "숏 서브"]; // 추가(숏서브 포함!)
+    const FRONT_RESPONDERS = ["언더클리어", "헤어핀"];
+    // 규칙: 후위샷(높이 띄우는 샷) 직후 응수
+    const BACK_RESPONDABLE_PREV = ["하이클리어", "롱 서브", "언더클리어", "클리어 수비"];
+    const BACK_RESPONDERS = ["스매시", "드롭", "하이클리어", "드라이브"];
+    // 기존: 드라이브/스매시 직후 응수
+    const SMASH_DRIVE_PREV = ["스매시", "드라이브"];
+    const SMASH_DRIVE_RESPONDERS = ["커트 수비", "클리어 수비"];
+
     const players = {
       A: { name: 'A', team: 'AB' },
       B: { name: 'B', team: 'AB' },
@@ -87,32 +107,56 @@
     };
 
     let history = [];
-
-    // 초기 위치 - 좌우 코트 중앙 기준
     let manualPositions = {
-      A: [100, 520],  // A 좌측 하단 중앙
-      B: [300, 520],  // B 우측 하단 중앙
-      C: [100, 50],   // C 좌측 상단 중앙
-      D: [300, 50]    // D 우측 상단 중앙
+      A: [100, 520], B: [300, 520],
+      C: [100, 50],  D: [300, 50]
     };
-
-    // 선수 클릭 위치 교환 관련
     let selectedPlayerId = null;
 
-    function clearAllOutlines() {
-      for (let id of ['A','B','C','D']) {
-        document.getElementById(id).style.outline = "";
-      }
+    // ----------- 드래그&드랍 -----------
+    let draggingPlayer = null, dragOffsetX=0, dragOffsetY=0;
+    function onPlayerMouseDown(e) {
+      draggingPlayer = e.target.id;
+      const rect = e.target.getBoundingClientRect();
+      const courtRect = document.getElementById('court').getBoundingClientRect();
+      dragOffsetX = e.clientX - rect.left;
+      dragOffsetY = e.clientY - rect.top;
+      document.addEventListener('mousemove', playerDragMove);
+      document.addEventListener('mouseup', playerDragEnd);
+      e.preventDefault();
     }
+    function playerDragMove(e) {
+      if (!draggingPlayer) return;
+      const court = document.getElementById('court');
+      const courtRect = court.getBoundingClientRect();
+      let minX = 0, minY = 0, maxX = court.offsetWidth - 60, maxY = court.offsetHeight - 30;
+      let x = e.clientX - courtRect.left - dragOffsetX;
+      let y = e.clientY - courtRect.top - dragOffsetY;
+      x = Math.max(minX, Math.min(maxX, x));
+      y = Math.max(minY, Math.min(maxY, y));
+      const elem = document.getElementById(draggingPlayer);
+      elem.style.left = x + 'px';
+      elem.style.top = y + 'px';
+      manualPositions[draggingPlayer] = [x, y];
+    }
+    function playerDragEnd(e) {
+      draggingPlayer = null;
+      document.removeEventListener('mousemove', playerDragMove);
+      document.removeEventListener('mouseup', playerDragEnd);
+    }
+    // ----------------------------------
 
+    function clearAllOutlines() {
+      for (let id of ['A','B','C','D']) document.getElementById(id).style.outline = "";
+    }
     function onPlayerClick(e) {
+      if (draggingPlayer) return;
       const id = e.target.id;
       if (!selectedPlayerId) {
         selectedPlayerId = id;
         clearAllOutlines();
         document.getElementById(id).style.outline = "3px solid #1976D2";
       } else if (selectedPlayerId && selectedPlayerId !== id) {
-        // 위치 교환
         const temp = [...manualPositions[selectedPlayerId]];
         manualPositions[selectedPlayerId] = [...manualPositions[id]];
         manualPositions[id] = temp;
@@ -124,7 +168,6 @@
         selectedPlayerId = null;
       }
     }
-
     function setPlayerNames() {
       players.A.name = document.getElementById('playerAName').value || 'A';
       players.B.name = document.getElementById('playerBName').value || 'B';
@@ -134,7 +177,6 @@
       updatePositions();
       renderShotHistory();
     }
-
     function updateDropdowns() {
       const senderSelect = document.getElementById('senderSelect');
       const receiverSelect = document.getElementById('receiverSelect');
@@ -148,7 +190,6 @@
       updateReceiverOptions();
       senderSelect.onchange = updateReceiverOptions;
     }
-
     function updateReceiverOptions() {
       const sender = document.getElementById('senderSelect').value;
       const receiverSelect = document.getElementById('receiverSelect');
@@ -160,7 +201,6 @@
         }
       }
     }
-
     function updatePositions() {
       for (const id of ['A','B','C','D']) {
         const [x, y] = manualPositions[id];
@@ -172,111 +212,79 @@
       clearAllOutlines();
       selectedPlayerId = null;
     }
-
     function executeSkill() {
       const sender = document.getElementById('senderSelect').value;
       const receiver = document.getElementById('receiverSelect').value;
       const skill = document.getElementById('skillSelect').value;
       history.push({ sender, receiver, skill });
-
       renderShotHistory();
-
       animateShuttle(sender, receiver);
-
       applyPositioning(sender, receiver, skill);
-
-      const log = document.getElementById('log');
-      log.innerHTML += `<p>${players[sender].name} → ${players[receiver].name} : ${skill}</p>`;
-
       document.getElementById('senderSelect').value = receiver;
       updateReceiverOptions();
     }
 
-    // 상황별 포지셔닝 - 항상 좌우 코트 중앙 기준 유지
     function applyPositioning(sender, receiver, skill) {
       const teamSender = players[sender].team;
       const partnerSender = Object.keys(players).find(p => players[p].team === teamSender && p !== sender);
       const teamReceiver = players[receiver].team;
       const partnerReceiver = Object.keys(players).find(p => players[p].team === teamReceiver && p !== receiver);
-
-      let pos = {...manualPositions}; // 기존 위치 복사
-
+      let pos = {...manualPositions};
       if (["하이클리어", "언더클리어", "클리어 수비", "롱 서브"].includes(skill)) {
-        // 보낸 팀 양쪽 옆 (수비)
-        if (teamSender === 'AB') {
-          pos.A = [100, 520]; pos.B = [300, 520];
-        } else {
-          pos.C = [100, 50]; pos.D = [300, 50];
-        }
-        // 받은 팀 후위+전위 (공격)
+        if (teamSender === 'AB') { pos.A = [100, 520]; pos.B = [300, 520]; }
+        else { pos.C = [100, 50]; pos.D = [300, 50]; }
         if (teamReceiver === 'AB') {
-          pos[receiver] = [200, 550];
-          pos[partnerReceiver] = [200, 480];
+          pos[receiver] = [200, 550]; pos[partnerReceiver] = [200, 480];
         } else {
-          pos[receiver] = [200, 20];
-          pos[partnerReceiver] = [200, 90];
+          if(receiver === "D") { pos.D = [200, 20]; pos.C = [200, 90]; }
+          else { pos[receiver] = [200, 20]; pos[partnerReceiver] = [200, 90]; }
         }
       }
       else if (skill === "커트 수비") {
         if (teamSender === 'AB') {
-          pos[sender] = [200, 480];
-          pos[partnerSender] = [200, 550];
+          pos[sender] = [200, 480]; pos[partnerSender] = [200, 550];
         } else {
-          pos[sender] = [200, 90];
-          pos[partnerSender] = [200, 20];
+          pos[sender] = [200, 90]; pos[partnerSender] = [200, 20];
         }
       }
       else if (skill === "숏 서브") {
         if (teamSender === 'AB') {
-          pos[sender] = [200, 480];
-          pos[partnerSender] = [200, 550];
+          pos[sender] = [200, 480]; pos[partnerSender] = [200, 550];
         } else {
-          pos[sender] = [200, 90];
-          pos[partnerSender] = [200, 20];
+          pos[sender] = [200, 90];  pos[partnerSender] = [200, 20];
         }
       }
       else if (skill === "헤어핀") {
-        // 헤어핀 구사자는 전위, 파트너 후위 (좌우 코트 중앙 기준)
         if (teamSender === 'AB') {
-          pos[sender] = [300, 480];      // B 위치 같은 우측 코트 중앙 전위에 가깝게
-          pos[partnerSender] = [100, 550];
+          pos[sender] = [300, 480]; pos[partnerSender] = [100, 550];
         } else {
-          pos[sender] = [300, 90];
-          pos[partnerSender] = [100, 20];
+          pos[sender] = [200, 90];  pos[partnerSender] = [200, 20];
         }
       }
       else if (["스매시", "드롭", "드라이브"].includes(skill)) {
         if (teamSender === 'AB') {
-          pos[sender] = [100, 550];
-          pos[partnerSender] = [300, 480];
+          pos[sender] = [100, 550]; pos[partnerSender] = [300, 480];
         } else {
-          pos[sender] = [100, 20];
-          pos[partnerSender] = [300, 90];
+          if(sender === 'D') { pos.D = [200, 20]; pos.C = [200, 90]; }
+          else { pos[sender] = [100, 20]; pos[partnerSender] = [300, 90]; }
         }
       }
       else {
         if (teamSender === 'AB') {
-          pos[sender] = [100, 550];
-          pos[partnerSender] = [300, 480];
+          pos[sender] = [100, 550]; pos[partnerSender] = [300, 480];
         } else {
-          pos[sender] = [100, 20];
-          pos[partnerSender] = [300, 90];
+          pos[sender] = [100, 20]; pos[partnerSender] = [300, 90];
         }
       }
-
       for(let k of ['A','B','C','D']) manualPositions[k] = [...pos[k]];
       updatePositions();
     }
 
     function swapPositions(team) {
-      if(team === 'AB') {
-        [manualPositions.A, manualPositions.B] = [manualPositions.B, manualPositions.A];
-      } else {
-        [manualPositions.C, manualPositions.D] = [manualPositions.D, manualPositions.C];
-      }
+      if(team === 'AB') [manualPositions.A, manualPositions.B] = [manualPositions.B, manualPositions.A];
+      else [manualPositions.C, manualPositions.D] = [manualPositions.D, manualPositions.C];
       updatePositions();
     }
-
     function animateShuttle(from, to) {
       const fromElem = document.getElementById(from);
       const toElem = document.getElementById(to);
@@ -291,42 +299,25 @@
       shuttle.animate([
         { left: fromX + 'px', top: fromY + 'px' },
         { left: toX + 'px', top: toY + 'px' }
-      ], {
-        duration: 600,
-        fill: 'forwards'
-      });
+      ], { duration: 600, fill: 'forwards' });
       setTimeout(() => { shuttle.style.display = 'none'; }, 700);
     }
-
     function goBack() {
       history.pop();
       document.getElementById('log').innerHTML = '';
-      manualPositions = {
-        A: [100, 520], B: [300, 520],
-        C: [100, 50],  D: [300, 50]
-      };
+      manualPositions = {A: [100, 520], B: [300, 520], C: [100, 50], D: [300, 50]};
       if(history.length > 0) {
-        history.forEach(({ sender, receiver, skill }) => {
-          applyPositioning(sender, receiver, skill);
-          document.getElementById('log').innerHTML += `<p>${players[sender].name} → ${players[receiver].name} : ${skill}</p>`;
-        });
-      } else {
-        updatePositions();
-      }
+        history.forEach(({ sender, receiver, skill }) => { applyPositioning(sender, receiver, skill); });
+      } else updatePositions();
       renderShotHistory();
     }
-
     function resetAll() {
       history = [];
       document.getElementById('log').innerHTML = '';
-      manualPositions = {
-        A: [100, 520], B: [300, 520],
-        C: [100, 50],  D: [300, 50]
-      };
+      manualPositions = {A: [100, 520], B: [300, 520], C: [100, 50], D: [300, 50]};
       updatePositions();
       renderShotHistory();
     }
-
     function renderShotHistory() {
       const shotListDiv = document.getElementById('shotHistoryList');
       shotListDiv.innerHTML = history.length === 0
@@ -337,11 +328,94 @@
           ).join('');
     }
 
+    // 샘플데이터 생성 규칙 (문제 피드백 반영, 본문 요구 완전 반영)
+    function generateSampleData() {
+      const skillOrderLimitPerPlayer = 2;
+      const teamPlayers = { 'A-B': ['A','B'], 'C-D':['C','D'] };
+      let seq = [];
+      let rallyUsedCounts = {A:0, B:0, C:0, D:0};
+      let firstServer = Math.random() < 0.5 ? "A" : "B";
+      let firstReceiver = Math.random() < 0.5 ? "C" : "D";
+      seq.push({sender: firstServer, receiver: firstReceiver, team: 'A-B'});
+      rallyUsedCounts[firstServer]++;
+      let lastReceiver = firstReceiver;
+      for(let i=1;i<10;i++){
+        let thisTeam = seq[i-1].team === 'A-B' ? 'C-D' : 'A-B';
+        let sender = lastReceiver;
+        rallyUsedCounts[sender]++;
+        let otherTeam = (thisTeam==='A-B')?'C-D':'A-B';
+        let receiverCandidates = teamPlayers[otherTeam].filter(p => p !== sender);
+        let receiver = receiverCandidates[Math.floor(Math.random()*receiverCandidates.length)];
+        seq.push({sender, receiver, team: thisTeam});
+        lastReceiver = receiver;
+      }
+      const sample = [];
+      const used = {A:[], B:[], C:[], D:[]};
+      let prevSkill = null;
+      for (let i = 0; i < seq.length; i++) {
+        const {sender, receiver, team} = seq[i];
+        let skill;
+        if (i === 0) {
+          skill = (Math.random() < 0.8) ? '숏 서브' : '롱 서브';
+        } else {
+          let allowedSkills = skillList.filter(
+            s => s !== "숏 서브" && s !== "롱 서브" && !used[sender].includes(s)
+          );
+          if (i > 0) {
+            const prevSample = sample[i-1];
+            // ① 전위샷·숏서브 직후: 오직 언더클리어, 헤어핀만
+            if (prevSample && FRONT_RESPONDABLE_PREV.includes(prevSample.skill)) {
+              allowedSkills = allowedSkills.filter(s => FRONT_RESPONDERS.includes(s));
+            }
+            // ② 후위샷(높게 띄우는 샷들) 직후: 스매시·드롭·하이클리어·드라이브만(전위/수비기술 금지)
+            else if (prevSample && BACK_RESPONDABLE_PREV.includes(prevSample.skill)) {
+              allowedSkills = allowedSkills.filter(s => BACK_RESPONDERS.includes(s));
+            }
+            // ③ 드라이브·스매시 직후: 커트수비/클리어수비만
+            if (prevSample && SMASH_DRIVE_PREV.includes(prevSample.skill)) {
+              allowedSkills = allowedSkills.filter(s => SMASH_DRIVE_RESPONDERS.includes(s));
+            }
+          }
+          // ---- 기존 세부 제한 로직 계속 ---
+          if (allowedSkills.includes("클리어 수비") || allowedSkills.includes("커트 수비")) {
+            const lastSkillWasSmash = prevSkill === "스매시";
+            allowedSkills = allowedSkills.filter(s => (s === "클리어 수비" || s === "커트 수비") ? lastSkillWasSmash : true );
+          }
+          // 롱서브 받은 직후 응수
+          if (
+            (i === 1 && prevSkill === "롱 서브") ||
+            (prevSkill === "롱 서브" && seq[i-1].team !== seq[i].team)
+          ) {
+            allowedSkills = allowedSkills.filter(s => ["하이클리어", "스매시", "드롭"].includes(s));
+          }
+          // D 후위: 스매시/드롭/하이클리어만
+          if (team === "C-D" && sender === "D" && isCDRearSituation(sample, i)) {
+            allowedSkills = allowedSkills.filter(s => D_REAR_SHOTS.includes(s));
+          }
+          skill = allowedSkills.length > 0 ? allowedSkills[Math.floor(Math.random() * allowedSkills.length)] : "드롭";
+        }
+        used[sender].push(skill);
+        sample.push({ sender, receiver, skill });
+        prevSkill = skill;
+      }
+      history = sample.slice();
+      manualPositions = {A: [100, 520], B: [300, 520], C: [100, 50], D: [300, 50]};
+      document.getElementById('log').innerHTML = '';
+      sample.forEach(({sender, receiver, skill}) => { applyPositioning(sender, receiver, skill); });
+      renderShotHistory();
+      updateDropdowns();
+      updatePositions();
+    }
+
+    function isCDRearSituation(sample, idx) { return idx !== 0; }
+
     window.addEventListener('DOMContentLoaded', () => {
       for (let id of ['A','B','C','D']) {
+        document.getElementById(id).addEventListener('mousedown', onPlayerMouseDown);
         document.getElementById(id).addEventListener('click', onPlayerClick);
       }
       setPlayerNames();
+      updatePositions();
     });
   </script>
 </body>
