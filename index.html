@@ -59,6 +59,7 @@
         <button onclick="executeSkill()">기술 사용</button>
         <button onclick="goBack()">이전</button>
         <button onclick="resetAll()">초기화</button>
+        <button onclick="playSampleShots()" id="replayShotBtn">샷 재생</button>
         <button onclick="generateSampleData()">샘플 데이터 생성</button>
       </div>
       <div id="court">
@@ -89,15 +90,15 @@
       "숏 서브","롱 서브","드롭","스매시","헤어핀","드라이브","언더클리어","하이클리어","커트 수비","클리어 수비"
     ];
     const D_REAR_SHOTS = ["스매시","드롭","하이클리어"];
-    // 규칙: 전위샷 직후 응수
-    const FRONT_RESPONDABLE_PREV = ["헤어핀", "드롭", "커트 수비", "숏 서브"]; // 추가(숏서브 포함!)
-    const FRONT_RESPONDERS = ["언더클리어", "헤어핀"];
-    // 규칙: 후위샷(높이 띄우는 샷) 직후 응수
-    const BACK_RESPONDABLE_PREV = ["하이클리어", "롱 서브", "언더클리어", "클리어 수비"];
-    const BACK_RESPONDERS = ["스매시", "드롭", "하이클리어", "드라이브"];
-    // 기존: 드라이브/스매시 직후 응수
-    const SMASH_DRIVE_PREV = ["스매시", "드라이브"];
-    const SMASH_DRIVE_RESPONDERS = ["커트 수비", "클리어 수비"];
+    const ONLY_NET_RESPONDABLE_PREV = ["숏 서브","드롭","헤어핀","커트 수비"];
+    const ONLY_NET_RESPONDERS = ["언더클리어", "헤어핀"];
+    const ONLY_REAR_RESPONDABLE_PREV = ["하이클리어", "언더클리어", "클리어 수비", "롱 서브"];
+    const ONLY_REAR_RESPONDERS = ["스매시", "드롭", "하이클리어", "드라이브"];
+    const DROPPABLE_PREV = ONLY_REAR_RESPONDABLE_PREV;
+    const SMASH_PREV = ["스매시"];
+    const SMASH_RESPONDERS = ["커트 수비", "클리어 수비"];
+    const DRIVE_PREV = ["드라이브"];
+    const DRIVE_RESPONDERS = ["커트 수비", "클리어 수비", "드라이브"];
 
     const players = {
       A: { name: 'A', team: 'AB' },
@@ -113,7 +114,7 @@
     };
     let selectedPlayerId = null;
 
-    // ----------- 드래그&드랍 -----------
+    // ----------- 드래그 & 드랍 -----------
     let draggingPlayer = null, dragOffsetX=0, dragOffsetY=0;
     function onPlayerMouseDown(e) {
       draggingPlayer = e.target.id;
@@ -144,7 +145,6 @@
       document.removeEventListener('mousemove', playerDragMove);
       document.removeEventListener('mouseup', playerDragEnd);
     }
-    // ----------------------------------
 
     function clearAllOutlines() {
       for (let id of ['A','B','C','D']) document.getElementById(id).style.outline = "";
@@ -223,13 +223,13 @@
       document.getElementById('senderSelect').value = receiver;
       updateReceiverOptions();
     }
-
     function applyPositioning(sender, receiver, skill) {
       const teamSender = players[sender].team;
       const partnerSender = Object.keys(players).find(p => players[p].team === teamSender && p !== sender);
       const teamReceiver = players[receiver].team;
       const partnerReceiver = Object.keys(players).find(p => players[p].team === teamReceiver && p !== receiver);
       let pos = {...manualPositions};
+
       if (["하이클리어", "언더클리어", "클리어 수비", "롱 서브"].includes(skill)) {
         if (teamSender === 'AB') { pos.A = [100, 520]; pos.B = [300, 520]; }
         else { pos.C = [100, 50]; pos.D = [300, 50]; }
@@ -261,12 +261,34 @@
           pos[sender] = [200, 90];  pos[partnerSender] = [200, 20];
         }
       }
+      // ★★★ 스매시(중앙 세로), 드롭/드라이브(벌어짐) 각각 분리
       else if (["스매시", "드롭", "드라이브"].includes(skill)) {
         if (teamSender === 'AB') {
-          pos[sender] = [100, 550]; pos[partnerSender] = [300, 480];
+          if (skill === '스매시') {
+            pos[sender] = [200, 550];
+            pos[partnerSender] = [200, 480];
+          } else {
+            pos[sender] = [100, 550];
+            pos[partnerSender] = [300, 480];
+          }
         } else {
-          if(sender === 'D') { pos.D = [200, 20]; pos.C = [200, 90]; }
-          else { pos[sender] = [100, 20]; pos[partnerSender] = [300, 90]; }
+          if (sender === 'D') {
+            if (skill === '스매시') {
+              pos.D = [200, 20];
+              pos.C = [200, 90];
+            } else {
+              pos.D = [200, 20];
+              pos.C = [200, 90];
+            }
+          } else {
+            if (skill === '스매시') {
+              pos[sender] = [200, 20];
+              pos[partnerSender] = [200, 90];
+            } else {
+              pos[sender] = [100, 20];
+              pos[partnerSender] = [300, 90];
+            }
+          }
         }
       }
       else {
@@ -279,12 +301,12 @@
       for(let k of ['A','B','C','D']) manualPositions[k] = [...pos[k]];
       updatePositions();
     }
-
     function swapPositions(team) {
       if(team === 'AB') [manualPositions.A, manualPositions.B] = [manualPositions.B, manualPositions.A];
       else [manualPositions.C, manualPositions.D] = [manualPositions.D, manualPositions.C];
       updatePositions();
     }
+    // 셔틀콕 애니메이션 속도(1/2) - duration 늘림
     function animateShuttle(from, to) {
       const fromElem = document.getElementById(from);
       const toElem = document.getElementById(to);
@@ -299,8 +321,8 @@
       shuttle.animate([
         { left: fromX + 'px', top: fromY + 'px' },
         { left: toX + 'px', top: toY + 'px' }
-      ], { duration: 600, fill: 'forwards' });
-      setTimeout(() => { shuttle.style.display = 'none'; }, 700);
+      ], { duration: 1200, fill: 'forwards' }); // 기존 600 → 1200
+      setTimeout(() => { shuttle.style.display = 'none'; }, 1300);
     }
     function goBack() {
       history.pop();
@@ -327,8 +349,38 @@
               `<div class="shotItem"><span style="color:#1668b3;font-weight:bold;">${players[sender].name}</span> &rarr; <span style="color:#e66413;">${players[receiver].name}</span> : <span style="color:#1976d2;">${skill}</span></div>`
           ).join('');
     }
-
-    // 샘플데이터 생성 규칙 (문제 피드백 반영, 본문 요구 완전 반영)
+    // --- 샷 자동 재생 기능(샘플/수동 모두) ---
+    let playingShot = false;
+    async function playSampleShots() {
+      if (playingShot) return;
+      if (!history.length) return;
+      playingShot = true;
+      document.getElementById('replayShotBtn').disabled = true;
+      // 항상 초깃값에서 시작
+      manualPositions = {A: [100, 520], B: [300, 520], C: [100, 50], D: [300, 50]};
+      updatePositions();
+      await delay(800);
+      for (let i = 0; i < history.length; i++) {
+        const {sender, receiver, skill} = history[i];
+        animateShuttle(sender, receiver);
+        applyPositioning(sender, receiver, skill);
+        highlightShotInHistory(i);
+        await delay(1700);
+      }
+      highlightShotInHistory(-1);
+      playingShot = false;
+      document.getElementById('replayShotBtn').disabled = false;
+    }
+    function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+    function highlightShotInHistory(idx) {
+      const listDiv = document.getElementById('shotHistoryList');
+      const nodes = listDiv.querySelectorAll('.shotItem');
+      nodes.forEach((node, i) => {
+        node.style.background = (history.length-1-i === idx) ? 'rgba(28,181,213,0.10)' : '';
+        node.style.fontWeight = (history.length-1-i === idx) ? 'bold' : '';
+      });
+    }
+    // --- 샘플 데이터 생성 규칙 ---
     function generateSampleData() {
       const skillOrderLimitPerPlayer = 2;
       const teamPlayers = { 'A-B': ['A','B'], 'C-D':['C','D'] };
@@ -363,36 +415,36 @@
           );
           if (i > 0) {
             const prevSample = sample[i-1];
-            // ① 전위샷·숏서브 직후: 오직 언더클리어, 헤어핀만
-            if (prevSample && FRONT_RESPONDABLE_PREV.includes(prevSample.skill)) {
-              allowedSkills = allowedSkills.filter(s => FRONT_RESPONDERS.includes(s));
+            if (prevSample && SMASH_PREV.includes(prevSample.skill)) {
+              allowedSkills = allowedSkills.filter(s => SMASH_RESPONDERS.includes(s));
             }
-            // ② 후위샷(높게 띄우는 샷들) 직후: 스매시·드롭·하이클리어·드라이브만(전위/수비기술 금지)
-            else if (prevSample && BACK_RESPONDABLE_PREV.includes(prevSample.skill)) {
-              allowedSkills = allowedSkills.filter(s => BACK_RESPONDERS.includes(s));
+            else if (prevSample && DRIVE_PREV.includes(prevSample.skill)) {
+              allowedSkills = allowedSkills.filter(s => DRIVE_RESPONDERS.includes(s));
             }
-            // ③ 드라이브·스매시 직후: 커트수비/클리어수비만
-            if (prevSample && SMASH_DRIVE_PREV.includes(prevSample.skill)) {
-              allowedSkills = allowedSkills.filter(s => SMASH_DRIVE_RESPONDERS.includes(s));
+            else if (prevSample && ONLY_NET_RESPONDABLE_PREV.includes(prevSample.skill)) {
+              allowedSkills = allowedSkills.filter(s => ONLY_NET_RESPONDERS.includes(s));
+            }
+            if (allowedSkills.includes("드롭") && (!prevSample || !DROPPABLE_PREV.includes(prevSample.skill))) {
+              allowedSkills = allowedSkills.filter(s => s !== "드롭");
+            }
+            else if (prevSample && ONLY_REAR_RESPONDABLE_PREV.includes(prevSample.skill)) {
+              allowedSkills = allowedSkills.filter(s => ONLY_REAR_RESPONDERS.includes(s));
             }
           }
-          // ---- 기존 세부 제한 로직 계속 ---
           if (allowedSkills.includes("클리어 수비") || allowedSkills.includes("커트 수비")) {
             const lastSkillWasSmash = prevSkill === "스매시";
             allowedSkills = allowedSkills.filter(s => (s === "클리어 수비" || s === "커트 수비") ? lastSkillWasSmash : true );
           }
-          // 롱서브 받은 직후 응수
           if (
             (i === 1 && prevSkill === "롱 서브") ||
             (prevSkill === "롱 서브" && seq[i-1].team !== seq[i].team)
           ) {
             allowedSkills = allowedSkills.filter(s => ["하이클리어", "스매시", "드롭"].includes(s));
           }
-          // D 후위: 스매시/드롭/하이클리어만
           if (team === "C-D" && sender === "D" && isCDRearSituation(sample, i)) {
             allowedSkills = allowedSkills.filter(s => D_REAR_SHOTS.includes(s));
           }
-          skill = allowedSkills.length > 0 ? allowedSkills[Math.floor(Math.random() * allowedSkills.length)] : "드롭";
+          skill = allowedSkills.length > 0 ? allowedSkills[Math.floor(Math.random() * allowedSkills.length)] : "언더클리어";
         }
         used[sender].push(skill);
         sample.push({ sender, receiver, skill });
