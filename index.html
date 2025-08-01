@@ -59,12 +59,12 @@
   </style>
 </head>
 <body>
-  <!-- 규칙 조건 및 안내문 추가 -->
+  <!-- 규칙 조건 및 안내문 수정 -->
   <div class="rule-notice">
     <strong>📝 스트로크 루틴 작성 조건</strong><br>
-    1. 모둠은 <strong>총 10개의 스트로크(서브 제외)</strong>를 작성해야 합니다.<br>
-    2. <strong>각 학생(선수)당 최소 2개의 서로 다른 기술</strong>을 수행해야 합니다.<br>
-    <span style="color:#cf174b">⚠️ '서브'는 스트로크 개수에 포함되지 않습니다.</span>
+    1. 모둠은 <strong>총 10개의 스트로크(<u>서브 포함</u>)</strong>를 작성해야 합니다.<br>
+    2. <strong>각 학생(선수)당 최소 2개의 서로 다른 기술(<u>서브 제외</u>)</strong>을 수행해야 합니다.<br>
+    <span style="color:#cf174b">⚠️ '숏 서브', '롱 서브'는 2번 조건 기술 개수 산정에서 제외합니다.</span>
   </div>
   <h2 style="text-align:center;">배드민턴 포지셔닝 시뮬레이터</h2>
   <div id="layout">
@@ -496,28 +496,29 @@
       updatePositions();
     });
 
-    // ----------- 아래부터 검증 기능 추가 -----------
-    // 스트로크 루틴 검증 함수
+    // ----------- 아래부터 검증 기능(조건만 수정) -----------
     function validateRoutine() {
-      // 1. "숏 서브"를 제외한 스트로크가 10개이어야 함
-      const countExceptShortServe = history.filter(item => item.skill !== "숏 서브").length;
-      // 2. 한 명당 최소 2개 이상의 서로 다른 기술(숏 서브 제외)을 사용했는지 체크
+      // 1. 서브 포함 10개의 스트로크를 했는지 검사
+      const strokeCount = history.length;
+
+      // 2. 한 명당 최소 2개 이상의 서로 다른 "서브 제외" 기술 사용 체크
+      // ('숏 서브', '롱 서브'는 제외)
       const skillPerPlayer = {A: new Set(), B: new Set(), C: new Set(), D: new Set()};
       for (const item of history) {
-        if(item.skill === "숏 서브") continue;
+        if(item.skill === "숏 서브" || item.skill === "롱 서브") continue;
         skillPerPlayer[item.sender].add(item.skill);
       }
+
       let errorMsgList = [];
-      if (countExceptShortServe !== 10) {
+      if (strokeCount !== 10) {
         errorMsgList.push(
-          `스트로크(숏 서브 제외) 개수가 ${countExceptShortServe}개입니다. 총 10개의 스트로크를 작성해야 합니다.`
+          `스트로크(서브 포함) 개수가 ${strokeCount}개입니다. 총 10개의 스트로크를 작성해야 합니다.`
         );
       }
-      // 각 선수별 체크
       for (const id of ['A','B','C','D']) {
         if (skillPerPlayer[id].size < 2) {
           errorMsgList.push(
-            `${players[id].name} 선수는 두 개 이상의 <서로 다른> 기술을 수행해야 합니다. (현재: ${[...skillPerPlayer[id]].join(', ') || '없음'})`
+            `${players[id].name} 선수는 (서브 제외) 두 개 이상의 <서로 다른> 기술을 수행해야 합니다. (현재: ${[...skillPerPlayer[id]].join(', ') || '없음'})`
           );
         }
       }
