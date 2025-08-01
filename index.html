@@ -1,11 +1,25 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="height:100%;">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=600, initial-scale=1.0" />
   <title>배드민턴 포지셔닝 시뮬레이터</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; background: #f2f2f2;}
+    html, body {
+      height: 100%;
+      overflow-y: auto;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #f2f2f2;
+      min-height: 100vh;
+      box-sizing: border-box;
+      overflow-y: auto;
+    }
     #layout { display: flex; flex-direction: row; align-items: flex-start; justify-content: center; margin-top: 16px; }
     #mainPanel { min-width: 450px; }
     #sidePanel {
@@ -28,9 +42,30 @@
     #shotHistoryTitle { font-weight: bold; font-size: 17px; color: #1668b3; margin-bottom: 12px; margin-top: 2px;}
     .shotItem { margin-bottom: 6px;}
     #swapButtons { margin-top: 12px; text-align: center;}
+    /* 조건 안내 스타일 */
+    .rule-notice {
+      background: #e7f4ff;
+      border: 1px solid #79a5d3;
+      border-radius: 7px;
+      padding: 15px 16px;
+      margin: 22px auto 6px auto;
+      width: 95%;
+      max-width: 670px;
+      font-size: 16px;
+      line-height: 1.7;
+      color: #12497a;
+    }
+    .rule-notice strong { color: #1976D2; font-weight: bold;}
   </style>
 </head>
 <body>
+  <!-- 규칙 조건 및 안내문 추가 -->
+  <div class="rule-notice">
+    <strong>📝 스트로크 루틴 작성 조건</strong><br>
+    1. 모둠은 <strong>총 10개의 스트로크(서브 제외)</strong>를 작성해야 합니다.<br>
+    2. <strong>각 학생(선수)당 최소 2개의 서로 다른 기술</strong>을 수행해야 합니다.<br>
+    <span style="color:#cf174b">⚠️ '서브'는 스트로크 개수에 포함되지 않습니다.</span>
+  </div>
   <h2 style="text-align:center;">배드민턴 포지셔닝 시뮬레이터</h2>
   <div id="layout">
     <div id="mainPanel">
@@ -61,6 +96,8 @@
         <button onclick="resetAll()">초기화</button>
         <button onclick="playSampleShots()" id="replayShotBtn">샷 재생</button>
         <button onclick="generateSampleData()">샘플 데이터 생성</button>
+        <!-- 검증 버튼 추가 -->
+        <button onclick="validateRoutine()" style="margin-left:18px; background:#1976d2;color:#fff; font-weight:bold;">루틴 검증</button>
       </div>
       <div id="court">
         <div id="centerLine"></div>
@@ -85,7 +122,7 @@
     </div>
   </div>
   <script>
-    // ----------- 규칙/상수 -----------
+    // ----------- 기존 변수/상수 및 함수 그대로 -----------
     const skillList = [
       "숏 서브","롱 서브","드롭","스매시","헤어핀","드라이브","언더클리어","하이클리어","커트 수비","클리어 수비"
     ];
@@ -99,23 +136,20 @@
     const SMASH_RESPONDERS = ["커트 수비", "클리어 수비"];
     const DRIVE_PREV = ["드라이브"];
     const DRIVE_RESPONDERS = ["커트 수비", "클리어 수비", "드라이브"];
-
     const players = {
       A: { name: 'A', team: 'AB' },
       B: { name: 'B', team: 'AB' },
       C: { name: 'C', team: 'CD' },
       D: { name: 'D', team: 'CD' },
     };
-
     let history = [];
     let manualPositions = {
       A: [100, 520], B: [300, 520],
       C: [100, 50],  D: [300, 50]
     };
     let selectedPlayerId = null;
-
-    // ----------- 드래그 & 드랍 -----------
     let draggingPlayer = null, dragOffsetX=0, dragOffsetY=0;
+
     function onPlayerMouseDown(e) {
       draggingPlayer = e.target.id;
       const rect = e.target.getBoundingClientRect();
@@ -145,7 +179,6 @@
       document.removeEventListener('mousemove', playerDragMove);
       document.removeEventListener('mouseup', playerDragEnd);
     }
-
     function clearAllOutlines() {
       for (let id of ['A','B','C','D']) document.getElementById(id).style.outline = "";
     }
@@ -229,7 +262,6 @@
       const teamReceiver = players[receiver].team;
       const partnerReceiver = Object.keys(players).find(p => players[p].team === teamReceiver && p !== receiver);
       let pos = {...manualPositions};
-
       if (["하이클리어", "언더클리어", "클리어 수비", "롱 서브"].includes(skill)) {
         if (teamSender === 'AB') { pos.A = [100, 520]; pos.B = [300, 520]; }
         else { pos.C = [100, 50]; pos.D = [300, 50]; }
@@ -306,7 +338,6 @@
       else [manualPositions.C, manualPositions.D] = [manualPositions.D, manualPositions.C];
       updatePositions();
     }
-    // 셔틀콕 애니메이션 속도(1/2) - duration 늘림
     function animateShuttle(from, to) {
       const fromElem = document.getElementById(from);
       const toElem = document.getElementById(to);
@@ -321,7 +352,7 @@
       shuttle.animate([
         { left: fromX + 'px', top: fromY + 'px' },
         { left: toX + 'px', top: toY + 'px' }
-      ], { duration: 1200, fill: 'forwards' }); // 기존 600 → 1200
+      ], { duration: 1200, fill: 'forwards' });
       setTimeout(() => { shuttle.style.display = 'none'; }, 1300);
     }
     function goBack() {
@@ -349,14 +380,12 @@
               `<div class="shotItem"><span style="color:#1668b3;font-weight:bold;">${players[sender].name}</span> &rarr; <span style="color:#e66413;">${players[receiver].name}</span> : <span style="color:#1976d2;">${skill}</span></div>`
           ).join('');
     }
-    // --- 샷 자동 재생 기능(샘플/수동 모두) ---
     let playingShot = false;
     async function playSampleShots() {
       if (playingShot) return;
       if (!history.length) return;
       playingShot = true;
       document.getElementById('replayShotBtn').disabled = true;
-      // 항상 초깃값에서 시작
       manualPositions = {A: [100, 520], B: [300, 520], C: [100, 50], D: [300, 50]};
       updatePositions();
       await delay(800);
@@ -380,7 +409,6 @@
         node.style.fontWeight = (history.length-1-i === idx) ? 'bold' : '';
       });
     }
-    // --- 샘플 데이터 생성 규칙 ---
     function generateSampleData() {
       const skillOrderLimitPerPlayer = 2;
       const teamPlayers = { 'A-B': ['A','B'], 'C-D':['C','D'] };
@@ -458,9 +486,7 @@
       updateDropdowns();
       updatePositions();
     }
-
     function isCDRearSituation(sample, idx) { return idx !== 0; }
-
     window.addEventListener('DOMContentLoaded', () => {
       for (let id of ['A','B','C','D']) {
         document.getElementById(id).addEventListener('mousedown', onPlayerMouseDown);
@@ -469,6 +495,39 @@
       setPlayerNames();
       updatePositions();
     });
+
+    // ----------- 아래부터 검증 기능 추가 -----------
+    // 스트로크 루틴 검증 함수
+    function validateRoutine() {
+      // 1. "숏 서브"를 제외한 스트로크가 10개이어야 함
+      const countExceptShortServe = history.filter(item => item.skill !== "숏 서브").length;
+      // 2. 한 명당 최소 2개 이상의 서로 다른 기술(숏 서브 제외)을 사용했는지 체크
+      const skillPerPlayer = {A: new Set(), B: new Set(), C: new Set(), D: new Set()};
+      for (const item of history) {
+        if(item.skill === "숏 서브") continue;
+        skillPerPlayer[item.sender].add(item.skill);
+      }
+      let errorMsgList = [];
+      if (countExceptShortServe !== 10) {
+        errorMsgList.push(
+          `스트로크(숏 서브 제외) 개수가 ${countExceptShortServe}개입니다. 총 10개의 스트로크를 작성해야 합니다.`
+        );
+      }
+      // 각 선수별 체크
+      for (const id of ['A','B','C','D']) {
+        if (skillPerPlayer[id].size < 2) {
+          errorMsgList.push(
+            `${players[id].name} 선수는 두 개 이상의 <서로 다른> 기술을 수행해야 합니다. (현재: ${[...skillPerPlayer[id]].join(', ') || '없음'})`
+          );
+        }
+      }
+      // 결과 안내 (alert 팝업)
+      if (errorMsgList.length === 0) {
+        alert("🙆‍♂️ 루틴이 조건을 모두 만족합니다! 잘 짰어요!");
+      } else {
+        alert("❌ 스트로크 루틴 오류\n\n" + errorMsgList.join('\n'));
+      }
+    }
   </script>
 </body>
 </html>
